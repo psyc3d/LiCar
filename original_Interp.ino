@@ -8,14 +8,21 @@ of the onboard LED indicating distance.*/
 #define echoPin 2                                     // Pin 2 Echo input
 #define onBoardLED 13                                 // Pin 13 onboard LED
 #define echo_int 0                                    // Interrupt id for echo pulse
+#define mot_input1 7                                  //mot input 1 (for both the motors)
+#define mot_input2 8                                  //mot input 2(for both the motors)
+#define enable 9                                      //enable pwm for both the motors
 
 #define TIMER_US 50                                   // 50 uS timer duration 
 #define TICK_COUNTS 4000                              // 200 mS worth of timer ticks
 
 
-float rel_vel[10];
-float rel_dist[11];
+float rel_vel[20];
+float rel_dist[21];
+int spd = 100;
 int count;
+int constant_one;
+int speed_control; 
+int mean;
 volatile long echo_start = 0;                         // Records start of echo pulse 
 volatile long echo_end = 0;                           // Records end of echo pulse
 volatile long echo_duration = 0;                      // Duration - difference between end and start
@@ -28,26 +35,43 @@ void setup()
   pinMode(trigPin, OUTPUT);                           // Trigger pin set to output
   pinMode(echoPin, INPUT);                            // Echo pin set to input
   pinMode(onBoardLED, OUTPUT);                        // Onboard LED pin set to output
-  
+  pinMode(mot_input1,OUTPUT);
+  pinMode(mot_input2,OUTPUT);
+  pinMode(enable,OUTPUT);
   Timer1.initialize(TIMER_US);                        // Initialise timer 1
   Timer1.attachInterrupt( timerIsr );                 // Attach interrupt to the timer service routine 
   attachInterrupt(echo_int, echo_interrupt, CHANGE);  // Attach interrupt to the sensor echo input
-  Serial.begin (9600);                                // Initialise the serial monitor output
 }
 
 void loop(){
-int i;
+  
+  
+int i;  //value for looping
+
+
+
 float dis = echo_duration*0.033/2;      //dis is the relative distance by multiplying echo duration * 0.033/2 cm/us 
-    //Serial.println(dis);      
+analogWrite(enable,dis*10);     //writing the pwm pin to the speed obtained from the slope
+    Serial.println(dis*10);      
              
     if (count < 11 ){
-      rel_dist[count] = echo_duration;                //assigning valsuse to the relative distance arra
-      count++;
+      rel_dist[count] = dis;                //assigning valsuse to the relative distance arra
+      if (dis<10){                           //caputure condition for sudden brakes
+        immediate_brake();
+        }
+        else{
+          start_motor();
+          count++;
+          }
     }                                                        
     else {
       count = 0;
       for(i = 0;i<10;i++){
         rel_vel[i] = rel_dist[i+1]-rel_dist[i];       //Converting relative distance into rel velocity
+//        Serial.println(i);
+//        Serial.println(rel_dist[i+1]);
+//        Serial.println(rel_dist[i]);
+//        Serial.println(rel_vel[i]);
         }
       //best fit line
       int x[10];
@@ -62,15 +86,28 @@ float dis = echo_duration*0.033/2;      //dis is the relative distance by multip
         j = j + rel_vel[i];
       }
       j = j/10;                     //j is the mean of the y coordinate
-      int mean;
-      for(i=0;i<10;i++){
+      
+      for(i=0;i<10;i++){            //Looping to get the optimum slope 
         mean = (x[i]-k)*(rel_vel[i]-j);
+//        Serial.println(mean);
         mean = mean/(pow(x[i]-k,2));
+//        Serial.println(mean);
+      }      
+//      Serial.println("Mean is ");
+//      Serial.println(mean);
+      if (mean<2){                   //if mean is less than 0 we dont need to change the speed
+        spd = spd;
       }
-      Serial.println(mean);
+      else{ 
+      //converting slope to pwm output
+      constant_one = 20;                //assumed constant for speed output
+      speed_control = mean*constant_one;
+      spd = speed_control;
+//      Serial.println("Speed is ");
+//      Serial.println(spd);
       }  
-                                                      // calculates double distance 
-    delay(100);                                       // every 100 mS
+    }                                                // calculates double distance 
+    delay(10);                                       // every 10 mS
 }
 
 // timerIsr() 50uS second interrupt ISR()
@@ -149,3 +186,15 @@ void distance_flasher()
          digitalWrite( onBoardLED, digitalRead( onBoardLED ) ^ 1 );   // Toggle the onboard LED
       }
 }
+
+void immediate_brake()
+{
+  digitalWrite(mot_input1,HIGH);
+  digitalWrite(mot_input2,HIGH);
+  Serial.println("The car has stopped");
+  }
+void start_motor()
+{
+  digitalWrite(mot_input2,HIGH);
+  digitalWrite(mot_input1,LOW);
+  }
