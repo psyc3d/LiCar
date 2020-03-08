@@ -1,4 +1,4 @@
-/*Interrupts from timer 1 are used to schedule and deliver the sensor
+  /*Interrupts from timer 1 are used to schedule and deliver the sensor
 trigger pulse. The same interrupt is used to control the flash rate
 of the onboard LED indicating distance.*/
 
@@ -56,7 +56,7 @@ analogWrite(enable,dis*10);     //writing the pwm pin to the speed obtained from
              
     if (count < 11 ){
       rel_dist[count] = dis;                //assigning valsuse to the relative distance arra
-      if (dis<10){                           //caputure condition for sudden brakes
+      if (dis<5){                           //caputure condition for sudden brakes
         immediate_brake();
         }
         else{
